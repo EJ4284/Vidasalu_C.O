@@ -21,6 +21,44 @@ Pagina de salud y ejercios
         <option value="athlete">Atleta (entrenamiento intenso diario)</option>
       </select>
     </div>
+    <div class="form-group">
+      <label for="allergies">Alergias alimentarias (selecciona todas las que apliquen):</label>
+      <div class="allergy-options">
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="gluten" value="gluten">
+          <label for="gluten">Gluten (trigo, cebada, centeno)</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="lactose" value="lactose">
+          <label for="lactose">Lactosa (productos lácteos)</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="nuts" value="nuts">
+          <label for="nuts">Frutos secos</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="seafood" value="seafood">
+          <label for="seafood">Mariscos</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="eggs" value="eggs">
+          <label for="eggs">Huevos</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="soy" value="soy">
+          <label for="soy">Soja</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="fish" value="fish">
+          <label for="fish">Pescado</label>
+        </div>
+        <div class="allergy-checkbox">
+          <input type="checkbox" id="other" value="other">
+          <label for="other">Otras alergias</label>
+          <input type="text" id="other-allergies" placeholder="Especifica" style="display: none; margin-top: 5px; width: 100%;">
+        </div>
+      </div>
+    </div>
     <button type="submit">Obtener mi plan personalizado</button>
   </form>
   
@@ -28,6 +66,9 @@ Pagina de salud y ejercios
     <h3>Resultado:</h3>
     <p>Tu IMC es: <span id="imc-value">0</span></p>
     <p>Clasificación: <span id="imc-classification">-</span></p>
+    <div class="allergy-warning" id="allergy-warning" style="display: none;">
+      <i class="icon">⚠️</i> <span id="allergy-warning-text"></span>
+    </div>
     <div id="imc-scale" class="scale">
       <div class="scale-labels">
         <span>Bajo peso</span>
@@ -132,6 +173,46 @@ Pagina de salud y ejercios
     border-color: #4CAF50;
     outline: none;
     box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+  }
+  
+  .allergy-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+  
+  .allergy-checkbox {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+  }
+  
+  .allergy-checkbox input[type="checkbox"] {
+    width: auto;
+    margin-right: 10px;
+  }
+  
+  .allergy-checkbox label {
+    margin-bottom: 0;
+    font-weight: 500;
+  }
+  
+  .allergy-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 12px;
+    border-radius: 6px;
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+  }
+  
+  .allergy-warning .icon {
+    margin-right: 10px;
+    font-size: 20px;
   }
   
   button[type="submit"] {
@@ -424,6 +505,10 @@ Pagina de salud y ejercios
       margin: 15px;
     }
     
+    .allergy-options {
+      grid-template-columns: 1fr;
+    }
+    
     .plan-tabs, .nutrition-tabs {
       flex-wrap: wrap;
     }
@@ -443,12 +528,104 @@ Pagina de salud y ejercios
 </style>
 
 <script>
+  // Mostrar campo para otras alergias cuando se selecciona la opción
+  document.getElementById('other').addEventListener('change', function() {
+    document.getElementById('other-allergies').style.display = this.checked ? 'block' : 'none';
+  });
+  
+  // Alimentos a excluir por cada alergia
+  const allergyExclusions = {
+    gluten: ['trigo', 'cebada', 'centeno', 'pan', 'pasta', 'harina', 'galletas', 'cereales', 'avena convencional', 'gluten'],
+    lactose: ['leche', 'queso', 'yogur', 'mantequilla', 'crema', 'lácteos', 'lactosa'],
+    nuts: ['nueces', 'almendras', 'avellanas', 'cacahuetes', 'pistachos', 'anacardos', 'frutos secos', 'mantequilla de maní'],
+    seafood: ['mariscos', 'camarones', 'gambas', 'langosta', 'cangrejo', 'mejillones', 'almejas', 'ostras'],
+    eggs: ['huevos', 'clara de huevo', 'yema', 'huevo', 'mayonesa', 'merengue'],
+    soy: ['soja', 'tofu', 'tempeh', 'leche de soja', 'salsa de soja', 'edamame'],
+    fish: ['pescado', 'salmón', 'atún', 'bacalao', 'merluza', 'trucha', 'sardinas']
+  };
+  
+  // Función para filtrar recomendaciones según alergias
+  function filterForAllergies(recommendation, allergies) {
+    if (!allergies || allergies.length === 0) return recommendation;
+    
+    let filtered = recommendation;
+    allergies.forEach(allergy => {
+      if (allergyExclusions[allergy]) {
+        allergyExclusions[allergy].forEach(exclusion => {
+          const regex = new RegExp(exclusion, 'gi');
+          filtered = filtered.replace(regex, match => {
+            return `<span class="allergy-alert" title="Contiene ${exclusion}" style="text-decoration: line-through; color: #e74c3c;">${match}</span>`;
+          });
+        });
+      }
+    });
+    
+    return filtered;
+  }
+  
+  // Función para verificar si una recomendación contiene alérgenos
+  function containsAllergens(text, allergies) {
+    if (!allergies || allergies.length === 0) return false;
+    
+    for (const allergy of allergies) {
+      if (allergyExclusions[allergy]) {
+        for (const exclusion of allergyExclusions[allergy]) {
+          const regex = new RegExp(exclusion, 'i');
+          if (regex.test(text)) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+  
+  // Función para generar alternativas para alérgenos
+  function generateAlternatives(allergies) {
+    if (!allergies || allergies.length === 0) return '';
+    
+    let alternatives = '<div class="allergy-alternatives"><h5>Alternativas para tus alergias:</h5><ul>';
+    
+    if (allergies.includes('gluten')) {
+      alternatives += '<li><strong>Sin gluten:</strong> Usa harinas de arroz, almendra o coco. Elige pan y pasta sin gluten.</li>';
+    }
+    if (allergies.includes('lactose')) {
+      alternatives += '<li><strong>Sin lactosa:</strong> Usa leches vegetales (almendra, avena, coco). Quesos veganos o sin lactosa.</li>';
+    }
+    if (allergies.includes('nuts')) {
+      alternatives += '<li><strong>Sin frutos secos:</strong> Usa semillas de girasol o calabaza como alternativa crujiente.</li>';
+    }
+    if (allergies.includes('seafood') || allergies.includes('fish')) {
+      alternatives += '<li><strong>Sin pescado/mariscos:</strong> Obtén proteínas de pollo, pavo, tofu o legumbres.</li>';
+    }
+    if (allergies.includes('eggs')) {
+      alternatives += '<li><strong>Sin huevos:</strong> Para cocinar usa 1 cda de semillas de chía + 3 cdas de agua por huevo.</li>';
+    }
+    if (allergies.includes('soy')) {
+      alternatives += '<li><strong>Sin soja:</strong> Usa garbanzos, lentejas o alubias como fuente de proteína vegetal.</li>';
+    }
+    
+    alternatives += '</ul></div>';
+    return alternatives;
+  }
+  
   document.getElementById('imc-form').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const weight = parseFloat(document.getElementById('weight').value);
     const height = parseInt(document.getElementById('height').value) / 100;
     const activityLevel = document.getElementById('activity-level').value;
+    
+    // Obtener alergias seleccionadas
+    const allergyCheckboxes = document.querySelectorAll('.allergy-options input[type="checkbox"]:checked');
+    const allergies = Array.from(allergyCheckboxes).map(cb => cb.value);
+    
+    // Obtener otras alergias especificadas
+    const otherAllergies = document.getElementById('other-allergies').value;
+    if (otherAllergies && document.getElementById('other').checked) {
+      allergies.push('other');
+    }
     
     if (weight && height) {
       const imc = weight / (height * height);
@@ -468,26 +645,28 @@ Pagina de salud y ejercios
         classification = 'Bajo peso';
         indicatorPosition = (imc / 18.5) * 25;
         
-        // Nutrición
+        // Desayunos
         breakfastRec = `<h5>Para aumentar energía y nutrientes</h5>
           <ul>
-            <li><strong>Avena hipercalórica:</strong> Avena cocida con leche entera, miel, nueces, almendras y trozos de plátano</li>
-            <li><strong>Tostadas integrales con aguacate y huevo:</strong> Pan integral con aguacate machacado, huevos revueltos y queso fresco</li>
-            <li><strong>Batido energético:</strong> Leche entera, plátano, mantequilla de maní, avena y miel</li>
+            <li><strong>Avena hipercalórica:</strong> Avena ${allergies.includes('gluten') ? '(sin gluten)' : ''} cocida con ${allergies.includes('lactose') ? 'leche vegetal' : 'leche entera'}, miel, ${allergies.includes('nuts') ? 'semillas de girasol' : 'nueces, almendras'} y trozos de plátano</li>
+            <li><strong>Tostadas integrales con aguacate y huevo:</strong> Pan ${allergies.includes('gluten') ? 'sin gluten' : 'integral'} con aguacate machacado, ${allergies.includes('eggs') ? 'tofu revuelto' : 'huevos revueltos'} y queso ${allergies.includes('lactose') ? 'sin lactosa' : 'fresco'}</li>
+            <li><strong>Batido energético:</strong> ${allergies.includes('lactose') ? 'Leche vegetal' : 'Leche entera'}, plátano, ${allergies.includes('nuts') ? 'semillas de calabaza' : 'mantequilla de maní'}, avena ${allergies.includes('gluten') ? 'sin gluten' : ''} y miel</li>
           </ul>`;
         
+        // Almuerzos
         lunchRec = `<h5>Almuerzos nutritivos y calóricos</h5>
           <ul>
-            <li><strong>Pasta integral con atún:</strong> Pasta integral con atún al natural, aceite de oliva, tomate cherry y espinacas</li>
+            <li><strong>Pasta ${allergies.includes('gluten') ? 'sin gluten' : 'integral'} con ${allergies.includes('fish') ? 'pollo' : 'atún'}:</strong> Pasta con ${allergies.includes('fish') ? 'pechuga de pollo' : 'atún al natural'}, aceite de oliva, tomate cherry y espinacas</li>
             <li><strong>Arroz con pollo y aguacate:</strong> Arroz integral con pechuga de pollo a la plancha, aguacate y vegetales salteados</li>
-            <li><strong>Ensalada de quinoa:</strong> Quinoa con garbanzos, aguacate, tomate, pepino y aderezo de tahini</li>
+            <li><strong>Ensalada de quinoa:</strong> Quinoa con garbanzos, aguacate, tomate, pepino y aderezo de ${allergies.includes('nuts') ? 'aceite de oliva y limón' : 'tahini'}</li>
           </ul>`;
         
+        // Cenas
         dinnerRec = `<h5>Cenas nutritivas y fáciles de digerir</h5>
           <ul>
-            <li><strong>Salmón al horno:</strong> Salmón con patatas asadas y brócoli al vapor</li>
-            <li><strong>Tortilla española:</strong> Tortilla de patata con cebolla y pan integral</li>
-            <li><strong>Sándwich nutritivo:</strong> Pan integral con pechuga de pavo, queso y aguacate</li>
+            <li><strong>${allergies.includes('fish') ? 'Pollo' : 'Salmón'} al horno:</strong> ${allergies.includes('fish') ? 'Pechuga de pollo' : 'Salmón'} con patatas asadas y brócoli al vapor</li>
+            <li><strong>Tortilla ${allergies.includes('eggs') ? 'de garbanzos (farinata)' : 'española'}:</strong> ${allergies.includes('eggs') ? 'Harina de garbanzos' : 'Huevos'} con ${allergies.includes('eggs') ? 'verduras salteadas' : 'patata y cebolla'} y pan ${allergies.includes('gluten') ? 'sin gluten' : 'integral'}</li>
+            <li><strong>Sándwich nutritivo:</strong> Pan ${allergies.includes('gluten') ? 'sin gluten' : 'integral'} con pechuga de pavo, queso ${allergies.includes('lactose') ? 'sin lactosa' : ''} y aguacate</li>
           </ul>`;
         
         // Ejercicios
@@ -543,7 +722,7 @@ Pagina de salud y ejercios
         lifestyleRec = `<h5>Consejos para aumentar peso saludablemente</h5>
           <ul>
             <li><strong>Come con frecuencia:</strong> 5-6 comidas al día para aumentar la ingesta calórica</li>
-            <li><strong>Elige alimentos densos en nutrientes:</strong> Frutos secos, aguacate, lácteos enteros, carnes magras</li>
+            <li><strong>Elige alimentos densos en nutrientes:</strong> ${allergies.includes('nuts') ? 'Semillas, aguacate' : 'Frutos secos, aguacate'}, ${allergies.includes('lactose') ? 'leches vegetales enriquecidas' : 'lácteos enteros'}, carnes magras</li>
             <li><strong>Entrena con pesas:</strong> El ejercicio de fuerza estimula el apetito y el crecimiento muscular</li>
             <li><strong>Descansa adecuadamente:</strong> Duerme 7-9 horas para permitir la recuperación muscular</li>
             <li><strong>Controla el estrés:</strong> El estrés crónico puede afectar tu apetito y metabolismo</li>
@@ -553,26 +732,28 @@ Pagina de salud y ejercios
         classification = 'Peso normal';
         indicatorPosition = 25 + ((imc - 18.5) / (25 - 18.5)) * 25;
         
-        // Nutrición
+        // Desayunos
         breakfastRec = `<h5>Para mantener tu peso saludable</h5>
           <ul>
-            <li><strong>Bowl de yogur y frutas:</strong> Yogur natural con fresas, arándanos, semillas de chía y granola</li>
-            <li><strong>Tortilla de espinacas:</strong> Tortilla de 2 huevos con espinacas frescas, tomate y pan integral</li>
-            <li><strong>Smoothie verde:</strong> Espinaca, plátano, leche de almendras y mantequilla de maní</li>
+            <li><strong>Bowl de yogur ${allergies.includes('lactose') ? 'vegetal' : 'natural'} y frutas:</strong> Yogur con fresas, arándanos, semillas de chía y ${allergies.includes('nuts') ? 'copos de coco' : 'granola'}</li>
+            <li><strong>Tortilla de espinacas:</strong> ${allergies.includes('eggs') ? 'Tofu revuelto' : 'Tortilla de 2 huevos'} con espinacas frescas, tomate y pan ${allergies.includes('gluten') ? 'sin gluten' : 'integral'}</li>
+            <li><strong>Smoothie verde:</strong> Espinaca, plátano, ${allergies.includes('lactose') ? 'leche de almendras' : 'leche de almendras o leche normal'}, ${allergies.includes('nuts') ? 'semillas de girasol' : 'mantequilla de maní'}</li>
           </ul>`;
         
+        // Almuerzos
         lunchRec = `<h5>Almuerzos equilibrados</h5>
           <ul>
-            <li><strong>Ensalada completa:</strong> Lechuga, quinoa, pollo a la plancha, aguacate y nueces</li>
-            <li><strong>Pescado al horno:</strong> Merluza o salmón con arroz integral y vegetales al vapor</li>
-            <li><strong>Wraps integrales:</strong> Tortillas integrales con pavo, vegetales frescos y guacamole</li>
+            <li><strong>Ensalada completa:</strong> Lechuga, quinoa, pollo a la plancha, aguacate y ${allergies.includes('nuts') ? 'semillas' : 'nueces'}</li>
+            <li><strong>${allergies.includes('fish') ? 'Pollo' : 'Pescado'} al horno:</strong> ${allergies.includes('fish') ? 'Pechuga de pollo' : 'Merluza o salmón'} con arroz integral y vegetales al vapor</li>
+            <li><strong>Wraps integrales:</strong> Tortillas ${allergies.includes('gluten') ? 'sin gluten' : 'integrales'} con pavo, vegetales frescos y guacamole</li>
           </ul>`;
         
+        // Cenas
         dinnerRec = `<h5>Cenas ligeras pero nutritivas</h5>
           <ul>
             <li><strong>Crema de verduras:</strong> Calabaza, zanahoria o brócoli con trozos de pavo</li>
-            <li><strong>Revuelto de setas:</strong> Huevo con champiñones y espárragos trigueros</li>
-            <li><strong>Salmón a la plancha:</strong> Con espárragos y puré de coliflor</li>
+            <li><strong>${allergies.includes('eggs') ? 'Tofu' : 'Revuelto'} de setas:</strong> ${allergies.includes('eggs') ? 'Tofu' : 'Huevo'} con champiñones y espárragos trigueros</li>
+            <li><strong>${allergies.includes('fish') ? 'Pollo' : 'Salmón'} a la plancha:</strong> ${allergies.includes('fish') ? 'Pechuga de pollo' : 'Salmón'} con espárragos y puré de coliflor</li>
           </ul>`;
         
         // Ejercicios
@@ -643,26 +824,28 @@ Pagina de salud y ejercios
         classification = 'Sobrepeso';
         indicatorPosition = 50 + ((imc - 25) / (30 - 25)) * 25;
         
-        // Nutrición
+        // Desayunos
         breakfastRec = `<h5>Para controlar el peso</h5>
           <ul>
-            <li><strong>Huevos pochados con espárragos:</strong> 1-2 huevos sobre espárragos salteados con aguacate</li>
-            <li><strong>Porridge de chía:</strong> Semillas de chía remojadas en leche desnatada con canela y frutos rojos</li>
-            <li><strong>Tostada integral con queso cottage:</strong> Pan integral con queso cottage, tomate y pimienta</li>
+            <li><strong>${allergies.includes('eggs') ? 'Tofu' : 'Huevos'} pochados con espárragos:</strong> ${allergies.includes('eggs') ? 'Tofu marinado' : '1-2 huevos'} sobre espárragos salteados con aguacate</li>
+            <li><strong>Porridge de chía:</strong> Semillas de chía remojadas en ${allergies.includes('lactose') ? 'leche vegetal' : 'leche desnatada'} con canela y frutos rojos</li>
+            <li><strong>Tostada integral con queso ${allergies.includes('lactose') ? 'vegano' : 'cottage'}:</strong> Pan ${allergies.includes('gluten') ? 'sin gluten' : 'integral'} con queso ${allergies.includes('lactose') ? 'vegano' : 'cottage'}, tomate y pimienta</li>
           </ul>`;
         
+        // Almuerzos
         lunchRec = `<h5>Almuerzos saciantes bajos en calorías</h5>
           <ul>
             <li><strong>Ensalada de garbanzos:</strong> Garbanzos con pepino, tomate, cebolla morada y vinagreta de limón</li>
-            <li><strong>Pollo al curry light:</strong> Pechuga de pollo con curry light, leche de coco light y vegetales</li>
+            <li><strong>Pollo al curry light:</strong> Pechuga de pollo con curry light, ${allergies.includes('lactose') ? 'leche de coco light' : 'leche de coco light o yogur griego'} y vegetales</li>
             <li><strong>Calabacines rellenos:</strong> Calabacín relleno de carne magra picada y quinoa</li>
           </ul>`;
         
+        // Cenas
         dinnerRec = `<h5>Cenas ligeras y proteicas</h5>
           <ul>
-            <li><strong>Sopa de miso con tofu:</strong> Sopa japonesa ligera con tofu y algas</li>
-            <li><strong>Tortilla de claras:</strong> Con espinacas y champiñones</li>
-            <li><strong>Pescado blanco al horno:</strong> Con pimentón y limón, acompañado de brócoli</li>
+            <li><strong>Sopa de miso con ${allergies.includes('soy') ? 'tofu de garbanzo' : 'tofu'}:</strong> Sopa japonesa ligera con ${allergies.includes('soy') ? 'tofu de garbanzo' : 'tofu'} y algas</li>
+            <li><strong>Tortilla de ${allergies.includes('eggs') ? 'garbanzos' : 'claras'}:</strong> Con espinacas y champiñones</li>
+            <li><strong>${allergies.includes('fish') ? 'Pollo' : 'Pescado blanco'} al horno:</strong> ${allergies.includes('fish') ? 'Pechuga de pollo' : 'Merluza'} con pimentón y limón, acompañado de brócoli</li>
           </ul>`;
         
         // Ejercicios
@@ -737,14 +920,15 @@ Pagina de salud y ejercios
         classification = 'Obesidad';
         indicatorPosition = 75 + ((Math.min(imc, 40) - 30) / (40 - 30)) * 25;
         
-        // Nutrición
+        // Desayunos
         breakfastRec = `<h5>Para comenzar el día de forma saludable</h5>
           <ul>
-            <li><strong>Revuelto de claras:</strong> 3 claras de huevo con espinacas, champiñones y tomate cherry</li>
-            <li><strong>Yogur desnatado con semillas:</strong> Yogur griego 0% con semillas de linaza y 5 almendras</li>
-            <li><strong>Pan integral con pavo:</strong> 1 rebanada de pan integral con pechuga de pavo y té verde</li>
+            <li><strong>Revuelto de ${allergies.includes('eggs') ? 'tofu' : 'claras'}:</strong> ${allergies.includes('eggs') ? 'Tofu desmenuzado' : '3 claras de huevo'} con espinacas, champiñones y tomate cherry</li>
+            <li><strong>Yogur ${allergies.includes('lactose') ? 'vegetal' : 'griego 0%'} con semillas:</strong> Yogur con semillas de linaza y ${allergies.includes('nuts') ? 'copos de coco' : '5 almendras'}</li>
+            <li><strong>Pan ${allergies.includes('gluten') ? 'sin gluten' : 'integral'} con pavo:</strong> 1 rebanada con pechuga de pavo y té verde</li>
           </ul>`;
         
+        // Almuerzos
         lunchRec = `<h5>Almuerzos saludables para control de peso</h5>
           <ul>
             <li><strong>Ensalada de lentejas:</strong> Lentejas con zanahoria, apio y vinagreta de mostaza</li>
@@ -752,11 +936,12 @@ Pagina de salud y ejercios
             <li><strong>Crema de calabacín:</strong> Sin patata, con trozos de pollo desmenuzado</li>
           </ul>`;
         
+        // Cenas
         dinnerRec = `<h5>Cenas muy ligeras y nutritivas</h5>
           <ul>
             <li><strong>Sopa de verduras:</strong> Con trozos de pavo o pollo</li>
-            <li><strong>Ensalada de atún:</strong> Lechuga, atún al natural, pepino y vinagre</li>
-            <li><strong>Pescado blanco al papillote:</strong> Con limón y especias, acompañado de espárragos</li>
+            <li><strong>Ensalada de ${allergies.includes('fish') ? 'pollo' : 'atún'}:</strong> Lechuga, ${allergies.includes('fish') ? 'pechuga de pollo' : 'atún al natural'}, pepino y vinagre</li>
+            <li><strong>${allergies.includes('fish') ? 'Pollo' : 'Pescado blanco'} al papillote:</strong> ${allergies.includes('fish') ? 'Pechuga de pollo' : 'Merluza'} con limón y especias, acompañado de espárragos</li>
           </ul>`;
         
         // Ejercicios
@@ -815,6 +1000,38 @@ Pagina de salud y ejercios
             <li><strong>Control médico:</strong> Realiza chequeos de presión, glucosa y colesterol</li>
             <li><strong>Grupos de apoyo:</strong> Considera unirte a grupos para manejo de peso</li>
           </ul>`;
+      }
+      
+      // Filtrar recomendaciones según alergias
+      breakfastRec = filterForAllergies(breakfastRec, allergies);
+      lunchRec = filterForAllergies(lunchRec, allergies);
+      dinnerRec = filterForAllergies(dinnerRec, allergies);
+      
+      // Mostrar advertencia si hay alergias
+      if (allergies.length > 0) {
+        let warningText = 'Hemos adaptado las recomendaciones para excluir: ';
+        warningText += allergies.map(a => {
+          if (a === 'gluten') return 'gluten';
+          if (a === 'lactose') return 'lactosa';
+          if (a === 'nuts') return 'frutos secos';
+          if (a === 'seafood') return 'mariscos';
+          if (a === 'eggs') return 'huevos';
+          if (a === 'soy') return 'soja';
+          if (a === 'fish') return 'pescado';
+          if (a === 'other') return otherAllergies || 'otras alergias';
+          return a;
+        }).join(', ');
+        
+        document.getElementById('allergy-warning-text').innerHTML = warningText;
+        document.getElementById('allergy-warning').style.display = 'flex';
+        
+        // Añadir alternativas para alergias
+        const alternatives = generateAlternatives(allergies);
+        breakfastRec += alternatives;
+        lunchRec += alternatives;
+        dinnerRec += alternatives;
+      } else {
+        document.getElementById('allergy-warning').style.display = 'none';
       }
       
       // Ajustar según nivel de actividad
